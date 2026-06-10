@@ -1,5 +1,11 @@
 import { REGIONS, PLATFORMS, type Region, type Platform } from './constants';
-import { HttpClient, createPlatformClient, createRegionalClient } from './utils/httpClient';
+import {
+  HttpClient,
+  createPlatformClient,
+  createRegionalClient,
+  type ClientRoutingOptions,
+  type RateLimitConfig,
+} from './utils/httpClient';
 import { AccountService } from './services/account';
 import { MatchService } from './services/match';
 import { SpectatorService } from './services/spectator';
@@ -9,6 +15,25 @@ import { LeagueService } from './services/league';
 export interface SamiraConfig {
   apiKey: string;
   region: Region;
+  /**
+   * Route every request through a gateway in PATH mode:
+   * `${baseUrl}/${platform}/<riot-path>` instead of `*.api.riotgames.com`.
+   * The gateway is expected to inject the real API key, so `apiKey` may be a
+   * placeholder when this is set.
+   */
+  baseUrl?: string;
+  /**
+   * Built-in client-side rate limiter. Pass `false` to disable it (recommended
+   * when `baseUrl` points at a gateway that owns rate limiting).
+   */
+  rateLimit?: false | RateLimitConfig;
+  /**
+   * Retry once on an upstream 429. Defaults to `true`; set `false` behind a
+   * gateway that already handles queuing/retries.
+   */
+  retryOn429?: boolean;
+  /** Default request priority; `'high'` sends `x-priority: high`. */
+  priority?: 'high' | 'normal';
 }
 
 export class Samira {
@@ -26,18 +51,22 @@ export class Samira {
   constructor(config: SamiraConfig) {
     this.config = config;
 
-    // Validate API key
-    if (!config.apiKey || config.apiKey.trim() === '') {
+    // Validate API key — only required when talking to Riot directly. When a
+    // gateway baseUrl is set, the gateway injects the key, so a placeholder is ok.
+    if (!config.baseUrl && (!config.apiKey || config.apiKey.trim() === '')) {
       throw new Error('API key is required');
     }
+
+    const routing = this.routingOptions();
 
     // Initialize HTTP clients
     this.platformClient = createPlatformClient(
       regionToPlatform(this.config.region as Region),
       this.config.apiKey,
+      routing,
     );
 
-    this.regionalClient = createRegionalClient(this.config.region, this.config.apiKey);
+    this.regionalClient = createRegionalClient(this.config.region, this.config.apiKey, routing);
 
     // Initialize services with smart routing
     this.account = new AccountService(this.platformClient);
@@ -49,6 +78,15 @@ export class Samira {
 
   getConfig(): SamiraConfig {
     return { ...this.config };
+  }
+
+  private routingOptions(): ClientRoutingOptions {
+    return {
+      gatewayBaseUrl: this.config.baseUrl,
+      rateLimit: this.config.rateLimit,
+      retryOn429: this.config.retryOn429,
+      priority: this.config.priority,
+    };
   }
 
   /**
@@ -65,7 +103,7 @@ export class Samira {
    */
   updateRegion(region: Region): void {
     this.config.region = region;
-    this.regionalClient = createRegionalClient(region, this.config.apiKey);
+    this.regionalClient = createRegionalClient(region, this.config.apiKey, this.routingOptions());
     this.account = new AccountService(this.regionalClient);
     this.match = new MatchService(this.regionalClient);
   }

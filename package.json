@@ -1,13 +1,16 @@
 {
-  "name": "samira",
-  "version": "1.0.5",
-  "description": "A TypeScript library for League of Legends API calls",
-  "author": "Gabriel-Passoss",
-  "homepage": "https://github.com/Gabriel-Passoss/Samira#readme",
-  "bugs": "https://github.com/Gabriel-Passoss/Samira/issues",
+  "name": "@airshade/riot-client",
+  "version": "1.0.0",
+  "description": "Riot API client for Airshade — hard fork of samira by Gabriel-Passoss, with riot-gateway PATH routing and configurable/disable-able rate limiting",
+  "author": "Airshade",
+  "contributors": [
+    "Gabriel-Passoss (original samira author)"
+  ],
+  "homepage": "https://github.com/airshadeSolutions/riot-client#readme",
+  "bugs": "https://github.com/airshadeSolutions/riot-client/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Gabriel-Passoss/Samira.git"
+    "url": "git+https://github.com/airshadeSolutions/riot-client.git"
   },
   "license": "MIT",
   "main": "dist/index.js",
@@ -27,6 +30,7 @@
     "build": "tsc",
     "dev": "ts-node src/index.ts",
     "clean": "rm -rf dist",
+    "prepare": "npm run build",
     "prepublishOnly": "npm run clean && npm run build",
     "test": "vitest",
     "test:ui": "vitest --ui",

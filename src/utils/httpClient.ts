@@ -3,12 +3,34 @@ import { RateLimiter } from './rateLimiter';
 import { Either, left, right } from '../types/either';
 import { ENDPOINTS, type Platform, type Region } from '../constants';
 
+export interface RateLimitConfig {
+  requestsPerSecond: number;
+  requestsPerTwoMinutes: number;
+}
+
 export interface HttpClientConfig {
   baseURL: string;
   apiKey?: string;
   timeout?: number;
   retries?: number;
   retryDelay?: number;
+  /**
+   * Built-in client-side rate limiter. Pass `false` to disable it entirely
+   * (e.g. when requests go through a gateway that owns rate limiting).
+   * Defaults to `{ requestsPerSecond: 20, requestsPerTwoMinutes: 100 }`.
+   */
+  rateLimit?: false | RateLimitConfig | undefined;
+  /**
+   * Whether to transparently retry once on an upstream 429 (honoring
+   * Retry-After). Defaults to `true`. Set `false` behind a gateway that already
+   * handles queuing/retries, to avoid double retries.
+   */
+  retryOn429?: boolean | undefined;
+  /**
+   * Default priority for every request from this client. When `'high'`, a
+   * `x-priority: high` header is sent (used by the riot-gateway priority queue).
+   */
+  priority?: 'high' | 'normal' | undefined;
 }
 
 export interface ApiResponse<T> {
@@ -27,43 +49,54 @@ export interface ApiError {
 
 export class HttpClient {
   private client: AxiosInstance;
-  private rateLimiter: RateLimiter;
+  private rateLimiter: RateLimiter | null;
   private config: HttpClientConfig;
 
   constructor(config: HttpClientConfig) {
     this.config = config;
-    this.rateLimiter = new RateLimiter({
-      requestsPerSecond: 20,
-      requestsPerTwoMinutes: 100,
-    });
+
+    // Rate limiter is optional — `rateLimit: false` disables it entirely.
+    this.rateLimiter =
+      config.rateLimit === false
+        ? null
+        : new RateLimiter(config.rateLimit ?? { requestsPerSecond: 20, requestsPerTwoMinutes: 100 });
+
+    const headers: Record<string, string> = {
+      'X-Riot-Token': config.apiKey ?? '',
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+    if (config.priority === 'high') {
+      headers['x-priority'] = 'high';
+    }
 
     this.client = axios.create({
       baseURL: config.baseURL,
       timeout: config.timeout || 10000,
-      headers: {
-        'X-Riot-Token': config.apiKey,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers,
     });
 
-    // Add request interceptor for rate limiting
-    this.client.interceptors.request.use(
-      async (config) => {
-        await this.rateLimiter.waitForNextRequest();
-        this.rateLimiter.recordRequest();
-        return config;
-      },
-      (error) => {
-        return Promise.reject(error);
-      },
-    );
+    // Add request interceptor for rate limiting (skipped when disabled)
+    if (this.rateLimiter) {
+      const limiter = this.rateLimiter;
+      this.client.interceptors.request.use(
+        async (config) => {
+          await limiter.waitForNextRequest();
+          limiter.recordRequest();
+          return config;
+        },
+        (error) => {
+          return Promise.reject(error);
+        },
+      );
+    }
 
     // Add response interceptor for error handling
+    const retryOn429 = config.retryOn429 ?? true;
     this.client.interceptors.response.use(
       (response: AxiosResponse) => response,
       async (error: AxiosError) => {
-        if (error.response?.status === 429) {
+        if (retryOn429 && error.response?.status === 429) {
           // Rate limit exceeded, wait and retry
           const retryAfter = error.response.headers['retry-after'];
           const delay = retryAfter ? parseInt(retryAfter) * 1000 : 1000;
@@ -154,17 +187,17 @@ export class HttpClient {
   }
 
   /**
-   * Get rate limiter status
+   * Get rate limiter status. Returns null when the limiter is disabled.
    */
   getRateLimitStatus() {
-    return this.rateLimiter.getStatus();
+    return this.rateLimiter ? this.rateLimiter.getStatus() : null;
   }
 
   /**
-   * Reset rate limiter
+   * Reset rate limiter. No-op when the limiter is disabled.
    */
   resetRateLimiter(): void {
-    this.rateLimiter.reset();
+    this.rateLimiter?.reset();
   }
 
   /**
@@ -265,22 +298,54 @@ export class HttpClient {
 }
 
 /**
+ * Extra options threaded from SamiraConfig into the platform/regional clients.
+ * When `gatewayBaseUrl` is set, requests are routed in PATH mode through it:
+ * `${gatewayBaseUrl}/${platform}/<riot-path>` instead of the direct Riot host.
+ */
+export interface ClientRoutingOptions {
+  gatewayBaseUrl?: string | undefined;
+  rateLimit?: false | RateLimitConfig | undefined;
+  retryOn429?: boolean | undefined;
+  priority?: 'high' | 'normal' | undefined;
+}
+
+function resolveBaseURL(routingValue: string, gatewayBaseUrl?: string): string {
+  return gatewayBaseUrl
+    ? `${gatewayBaseUrl.replace(/\/$/, '')}/${routingValue}`
+    : `https://${routingValue}.api.riotgames.com`;
+}
+
+/**
  * Create an HTTP client for a specific platform
  */
-export function createPlatformClient(platform: Platform, apiKey: string): HttpClient {
+export function createPlatformClient(
+  platform: Platform,
+  apiKey: string,
+  opts: ClientRoutingOptions = {},
+): HttpClient {
   return new HttpClient({
-    baseURL: `https://${platform}.api.riotgames.com`,
+    baseURL: resolveBaseURL(platform, opts.gatewayBaseUrl),
     apiKey,
+    rateLimit: opts.rateLimit,
+    retryOn429: opts.retryOn429,
+    priority: opts.priority,
   });
 }
 
 /**
  * Create an HTTP client for regional routing
  */
-export function createRegionalClient(region: Region, apiKey: string): HttpClient {
+export function createRegionalClient(
+  region: Region,
+  apiKey: string,
+  opts: ClientRoutingOptions = {},
+): HttpClient {
   return new HttpClient({
-    baseURL: `https://${region}.api.riotgames.com`,
+    baseURL: resolveBaseURL(region, opts.gatewayBaseUrl),
     apiKey,
+    rateLimit: opts.rateLimit,
+    retryOn429: opts.retryOn429,
+    priority: opts.priority,
   });
 }
 
