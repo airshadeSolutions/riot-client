@@ -34,6 +34,8 @@ export interface SamiraConfig {
   retryOn429?: boolean;
   /** Default request priority; `'high'` sends `x-priority: high`. */
   priority?: 'high' | 'normal';
+  /** Extra headers sent with every request (e.g. `x-airshade-service`). */
+  defaultHeaders?: Record<string, string>;
 }
 
 export class Samira {
@@ -86,6 +88,7 @@ export class Samira {
       rateLimit: this.config.rateLimit,
       retryOn429: this.config.retryOn429,
       priority: this.config.priority,
+      defaultHeaders: this.config.defaultHeaders,
     };
   }
 

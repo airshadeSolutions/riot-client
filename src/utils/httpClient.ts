@@ -31,6 +31,8 @@ export interface HttpClientConfig {
    * `x-priority: high` header is sent (used by the riot-gateway priority queue).
    */
   priority?: 'high' | 'normal' | undefined;
+  /** Extra headers merged into every request from this client. */
+  defaultHeaders?: Record<string, string> | undefined;
 }
 
 export interface ApiResponse<T> {
@@ -65,6 +67,7 @@ export class HttpClient {
       'X-Riot-Token': config.apiKey ?? '',
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      ...config.defaultHeaders,
     };
     if (config.priority === 'high') {
       headers['x-priority'] = 'high';
@@ -307,6 +310,7 @@ export interface ClientRoutingOptions {
   rateLimit?: false | RateLimitConfig | undefined;
   retryOn429?: boolean | undefined;
   priority?: 'high' | 'normal' | undefined;
+  defaultHeaders?: Record<string, string> | undefined;
 }
 
 function resolveBaseURL(routingValue: string, gatewayBaseUrl?: string): string {
@@ -329,6 +333,7 @@ export function createPlatformClient(
     rateLimit: opts.rateLimit,
     retryOn429: opts.retryOn429,
     priority: opts.priority,
+    defaultHeaders: opts.defaultHeaders,
   });
 }
 
@@ -346,6 +351,7 @@ export function createRegionalClient(
     rateLimit: opts.rateLimit,
     retryOn429: opts.retryOn429,
     priority: opts.priority,
+    defaultHeaders: opts.defaultHeaders,
   });
 }
 
