@@ -1,45 +1,21 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { Samira } from '../../src/samira';
-import { PLATFORMS, REGIONS, Region } from '../../src/constants';
+import { createE2ESamira, E2E_ACCOUNT, waitForRateLimit } from '../e2e-utils';
 
 describe('League Service E2E', () => {
   let samira: Samira;
 
   beforeAll(() => {
-    // Check if API key is available
-    if (!process.env.RIOT_API_KEY) {
-      console.warn('⚠️  RIOT_API_KEY not found, using test key for debugging');
-    }
-
-    samira = new Samira({
-      apiKey: process.env.RIOT_API_KEY!,
-      region: REGIONS.BR1,
-    });
+    samira = createE2ESamira(E2E_ACCOUNT.region);
   });
 
-  // Rate limiting helper function
-  const waitForRateLimit = async () => {
-    const status = samira.getRegionalClient().getRateLimitStatus();
-
-    if (!status.canMakeRequest) {
-      const delay = status.delayUntilNext;
-      await new Promise((resolve) => setTimeout(resolve, delay + 100));
-    }
-
-    if (status.requestsInWindow >= 80) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  };
-
   beforeEach(async () => {
-    // Wait for rate limits before each test
-    await waitForRateLimit();
+    await waitForRateLimit(samira.getRegionalClient());
   });
 
   describe('getEntriesByPuuid', () => {
     it('should fetch league entries by PUUID successfully', async () => {
-      const puuid =
-        'ZrXebR0htvpXhiz8D75UGNtYhcCNRqXIAO4kGieSfwJbihV1PKTjTd2sP1CsgqClaL-vw812L7h7iQ';
+      const { puuid } = E2E_ACCOUNT;
 
       const result = await samira.league.getEntriesByPuuid(puuid);
 
@@ -67,8 +43,7 @@ describe('League Service E2E', () => {
 
   describe('API response validation', () => {
     it('should return properly formatted league entries data', async () => {
-      const puuid =
-        'ZrXebR0htvpXhiz8D75UGNtYhcCNRqXIAO4kGieSfwJbihV1PKTjTd2sP1CsgqClaL-vw812L7h7iQ';
+      const { puuid } = E2E_ACCOUNT;
 
       const result = await samira.league.getEntriesByPuuid(puuid);
 
@@ -110,10 +85,10 @@ describe('League Service E2E', () => {
         expect(entries[0].leaguePoints).toBeGreaterThanOrEqual(0);
         expect(entries[0].wins).toBeGreaterThanOrEqual(0);
         expect(entries[0].losses).toBeGreaterThanOrEqual(0);
-        expect(entries[0].hotStreak).toBe(false);
-        expect(entries[0].veteran).toBe(false);
-        expect(entries[0].freshBlood).toBe(false);
-        expect(entries[0].inactive).toBe(false);
+        expect(typeof entries[0].hotStreak).toBe('boolean');
+        expect(typeof entries[0].veteran).toBe('boolean');
+        expect(typeof entries[0].freshBlood).toBe('boolean');
+        expect(typeof entries[0].inactive).toBe('boolean');
         if (entries[0].miniSeries) {
           expect(entries[0].miniSeries.losses).toBeGreaterThanOrEqual(0);
           expect(entries[0].miniSeries.progress).toBeDefined();

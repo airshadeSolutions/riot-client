@@ -1,10 +1,5 @@
 import { ENDPOINTS } from '../constants';
-import {
-  CurrentGameSchema,
-  FeaturedGamesSchema,
-  type CurrentGame,
-  type FeaturedGames,
-} from '../types';
+import { CurrentGameSchema, type CurrentGame } from '../types';
 import { left, right, type Either } from '../types/either';
 import type { ApiError, HttpClient } from '../utils/httpClient';
 
@@ -23,16 +18,4 @@ export class SpectatorService {
     return right(game);
   }
 
-  async getFeaturedGames(): Promise<Either<ApiError, FeaturedGames>> {
-    const url = ENDPOINTS.FEATURED_GAMES;
-    const response = await this.httpClient.get(url);
-
-    if (response.isLeft()) {
-      return left(response.value);
-    }
-
-    const featuredGames = FeaturedGamesSchema.parse(response.value.data);
-
-    return right(featuredGames);
-  }
 }

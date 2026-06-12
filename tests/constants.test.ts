@@ -22,13 +22,14 @@ describe('Constants', () => {
       expect(REGIONS).toHaveProperty('KR', 'kr');
       expect(REGIONS).toHaveProperty('LA1', 'la1');
       expect(REGIONS).toHaveProperty('LA2', 'la2');
+      expect(REGIONS).toHaveProperty('ME1', 'me1');
       expect(REGIONS).toHaveProperty('NA1', 'na1');
       expect(REGIONS).toHaveProperty('OC1', 'oc1');
       expect(REGIONS).toHaveProperty('PH2', 'ph2');
     });
 
     it('should have correct number of regions', () => {
-      expect(Object.keys(REGIONS)).toHaveLength(16);
+      expect(Object.keys(REGIONS)).toHaveLength(17);
     });
   });
 
@@ -83,11 +84,13 @@ describe('Constants', () => {
 
     it('should have match endpoints', () => {
       expect(ENDPOINTS).toHaveProperty('MATCH_BY_ID');
+      expect(ENDPOINTS).toHaveProperty('MATCH_TIMELINE_BY_ID');
       expect(ENDPOINTS).toHaveProperty('MATCHES_BY_PUUID');
     });
 
     it('should have league endpoints', () => {
       expect(ENDPOINTS).toHaveProperty('LEAGUE_ENTRIES_BY_PUUID');
+      expect(ENDPOINTS).toHaveProperty('LEAGUE_EXP_ENTRIES');
     });
 
     it('should have account endpoints', () => {
@@ -103,6 +106,7 @@ describe('Constants', () => {
 
     it('should have spectator endpoints', () => {
       expect(ENDPOINTS).toHaveProperty('CURRENT_GAME_BY_SUMMONER');
+      expect(ENDPOINTS).not.toHaveProperty('FEATURED_GAMES');
     });
 
     it('should have status endpoints', () => {

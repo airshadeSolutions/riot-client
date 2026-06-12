@@ -147,7 +147,8 @@ export const ChallengeSchema = z.object({
   wardsGuarded: z.number().optional(),
   wardTakedowns: z.number().optional(),
   wardTakedownsBefore20M: z.number().optional(),
-});
+  HealFromMapSources: z.number().optional(),
+}).passthrough();
 
 export const MissionSchema = z.object({
   playerScore0: z.number().optional(),
@@ -162,14 +163,26 @@ export const MissionSchema = z.object({
   playerScore9: z.number().optional(),
   playerScore10: z.number().optional(),
   playerScore11: z.number().optional(),
-});
+  PlayerScore0: z.number().optional(),
+  PlayerScore1: z.number().optional(),
+  PlayerScore2: z.number().optional(),
+  PlayerScore3: z.number().optional(),
+  PlayerScore4: z.number().optional(),
+  PlayerScore5: z.number().optional(),
+  PlayerScore6: z.number().optional(),
+  PlayerScore7: z.number().optional(),
+  PlayerScore8: z.number().optional(),
+  PlayerScore9: z.number().optional(),
+  PlayerScore10: z.number().optional(),
+  PlayerScore11: z.number().optional(),
+}).passthrough();
 
 export const MatchPerksSchema = z.object({
   statPerks: z.object({
     defense: z.number(),
     flex: z.number(),
     offense: z.number(),
-  }),
+  }).passthrough(),
   styles: z.array(
     z.object({
       description: z.string(),
@@ -179,17 +192,18 @@ export const MatchPerksSchema = z.object({
           var1: z.number(),
           var2: z.number(),
           var3: z.number(),
-        }),
+        }).passthrough(),
       ),
       style: z.number(),
-    }),
+    }).passthrough(),
   ),
-});
+}).passthrough();
 
 export const MatchParticipantSchema = z.object({
   allInPings: z.number().optional(),
   assistMePings: z.number().optional(),
   assists: z.number(),
+  basicPings: z.number().optional(),
   baronKills: z.number(),
   bountyLevel: z.number().optional(),
   champExperience: z.number(),
@@ -200,11 +214,13 @@ export const MatchParticipantSchema = z.object({
   championTransform: z.number().optional(),
   consumablesPurchased: z.number(),
   damageDealtToBuildings: z.number(),
+  damageDealtToEpicMonsters: z.number().optional(),
   damageDealtToObjectives: z.number(),
   damageDealtToTurrets: z.number(),
   damageSelfMitigated: z.number(),
   deaths: z.number(),
   detectorWardsPlaced: z.number(),
+  dangerPings: z.number().optional(),
   doubleKills: z.number(),
   dragonKills: z.number(),
   eligibleForProgression: z.boolean().optional(),
@@ -215,6 +231,7 @@ export const MatchParticipantSchema = z.object({
   firstTowerAssist: z.boolean(),
   firstTowerKill: z.boolean(),
   gameEndedInEarlySurrender: z.boolean(),
+  gameEndedInIGNBSurrender: z.boolean().optional(),
   gameEndedInSurrender: z.boolean(),
   holdPings: z.number().optional(),
   getBackPings: z.number().optional(),
@@ -251,6 +268,7 @@ export const MatchParticipantSchema = z.object({
   objectivesStolenAssists: z.number(),
   onMyWayPings: z.number().optional(),
   participantId: z.number(),
+  PlayerBehavior: z.unknown().optional(),
   playerScore0: z.number().optional(),
   playerScore1: z.number().optional(),
   playerScore2: z.number().optional(),
@@ -263,6 +281,18 @@ export const MatchParticipantSchema = z.object({
   playerScore9: z.number().optional(),
   playerScore10: z.number().optional(),
   playerScore11: z.number().optional(),
+  PlayerScore0: z.number().optional(),
+  PlayerScore1: z.number().optional(),
+  PlayerScore2: z.number().optional(),
+  PlayerScore3: z.number().optional(),
+  PlayerScore4: z.number().optional(),
+  PlayerScore5: z.number().optional(),
+  PlayerScore6: z.number().optional(),
+  PlayerScore7: z.number().optional(),
+  PlayerScore8: z.number().optional(),
+  PlayerScore9: z.number().optional(),
+  PlayerScore10: z.number().optional(),
+  PlayerScore11: z.number().optional(),
   pentaKills: z.number(),
   physicalDamageDealt: z.number(),
   physicalDamageDealtToChampions: z.number(),
@@ -272,7 +302,10 @@ export const MatchParticipantSchema = z.object({
   playerAugment2: z.number().optional(),
   playerAugment3: z.number().optional(),
   playerAugment4: z.number().optional(),
+  playerAugment5: z.number().optional(),
+  playerAugment6: z.number().optional(),
   playerSubteamId: z.number().optional(),
+  positionAssignedByMatchmaking: z.string().optional(),
   pushPings: z.number().optional(),
   profileIcon: z.number(),
   puuid: z.string(),
@@ -280,6 +313,9 @@ export const MatchParticipantSchema = z.object({
   riotIdGameName: z.string(),
   riotIdTagline: z.string(),
   role: z.string(),
+  roleBoundItem: z.number().optional(),
+  retreatPings: z.number().optional(),
+  selectedRolePreferences: z.string().optional(),
   sightWardsBoughtInGame: z.number(),
   spell1Casts: z.number(),
   spell2Casts: z.number(),
@@ -293,8 +329,10 @@ export const MatchParticipantSchema = z.object({
   summonerId: z.string(),
   summonerLevel: z.number(),
   summonerName: z.string(),
+  causedGameEndFromIGNBSurrender: z.boolean().optional(),
   teamEarlySurrendered: z.boolean(),
   teamId: z.number(),
+  teamIGNBSurrendered: z.boolean().optional(),
   teamPosition: z.string(),
   timeCCingOthers: z.number(),
   timePlayed: z.number(),
@@ -324,10 +362,13 @@ export const MatchParticipantSchema = z.object({
   wardsKilled: z.number(),
   wardsPlaced: z.number(),
   win: z.boolean(),
+  wasPremadeWithIGNBGameEndCauser: z.boolean().optional(),
+  wasPremadeWithSevereTransgressor: z.boolean().optional(),
+  wasSevereTransgressor: z.boolean().optional(),
   challenges: ChallengeSchema.optional(),
   missions: MissionSchema.optional(),
   perks: MatchPerksSchema.optional(),
-});
+}).partial().passthrough();
 
 export type MatchParticipant = z.infer<typeof MatchParticipantSchema>;
 export type Challenge = z.infer<typeof ChallengeSchema>;

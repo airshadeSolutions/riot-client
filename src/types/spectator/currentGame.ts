@@ -15,9 +15,9 @@ export const CurrentGameSchema = z.object({
   gameQueueConfigId: z.number(),
   observers: z.object({
     encryptionKey: z.string(),
-  }),
+  }).passthrough(),
   participants: z.array(SpectatorParticipantSchema),
   gameCustomizationObjects: z.array(GameCustomizationObjectSchema).optional(),
-});
+}).passthrough();
 
 export type CurrentGame = z.infer<typeof CurrentGameSchema>;

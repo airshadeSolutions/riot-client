@@ -47,6 +47,7 @@ export interface ApiError {
   statusText: string;
   message: string;
   details?: any;
+  headers?: Record<string, string>;
 }
 
 export class HttpClient {
@@ -239,6 +240,9 @@ export class HttpClient {
       }
 
       // Use response data values if available
+      if (typeof responseData === 'string' && responseData.trim()) {
+        message = responseData;
+      }
       if (responseData?.statusText) {
         statusText = responseData.statusText;
       }
@@ -251,6 +255,7 @@ export class HttpClient {
         statusText,
         message,
         details: error.response.data,
+        headers: error.response.headers as Record<string, string>,
       };
     } else if (error.request) {
       // Request was made but no response received

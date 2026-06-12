@@ -22,6 +22,10 @@ export interface MatchFilterOptions {
   endTime?: number;
 }
 
+export interface MatchRequestOptions {
+  raw?: boolean;
+}
+
 export class MatchService {
   private client: HttpClient;
 
@@ -32,12 +36,21 @@ export class MatchService {
   /**
    * Get match by match ID
    */
-  async getMatchById(matchId: string): Promise<Either<ApiError, Match>> {
+  async getMatchById(matchId: string): Promise<Either<ApiError, Match>>;
+  async getMatchById(matchId: string, options: { raw: true }): Promise<Either<ApiError, unknown>>;
+  async getMatchById(
+    matchId: string,
+    options?: MatchRequestOptions,
+  ): Promise<Either<ApiError, Match | unknown>> {
     const url = ENDPOINTS.MATCH_BY_ID.replace('{matchId}', matchId);
-    const response = await this.client.get<Match>(url);
+    const response = await this.client.get<unknown>(url);
 
     if (response.isLeft()) {
       return left(response.value);
+    }
+
+    if (options?.raw) {
+      return right(response.value.data);
     }
 
     try {
@@ -51,6 +64,20 @@ export class MatchService {
         details: error,
       });
     }
+  }
+
+  /**
+   * Get raw match timeline by match ID.
+   */
+  async getMatchTimelineById(matchId: string): Promise<Either<ApiError, unknown>> {
+    const url = ENDPOINTS.MATCH_TIMELINE_BY_ID.replace('{matchId}', matchId);
+    const response = await this.client.get<unknown>(url);
+
+    if (response.isLeft()) {
+      return left(response.value);
+    }
+
+    return right(response.value.data);
   }
 
   /**

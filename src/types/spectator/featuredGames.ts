@@ -11,16 +11,16 @@ export const FeaturedGameInfoSchema = z.object({
   gameId: z.number(),
   observers: z.object({
     encryptionKey: z.string(),
-  }),
+  }).passthrough(),
   gameQueueConfigId: z.number(),
   participants: z.array(SpectatorParticipantSchema),
   platformId: z.string(),
-});
+}).passthrough();
 
 export const FeaturedGamesSchema = z.object({
   gameList: z.array(FeaturedGameInfoSchema),
   clientRefreshInterval: z.number().optional(),
-});
+}).passthrough();
 
 export type FeaturedGameInfo = z.infer<typeof FeaturedGameInfoSchema>;
 export type FeaturedGames = z.infer<typeof FeaturedGamesSchema>;

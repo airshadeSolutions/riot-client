@@ -18,5 +18,5 @@ export { SpectatorService } from './services/spectator';
 export { SummonerService } from './services/summoner';
 
 // Export utilities
-export { HttpClient } from './utils/httpClient';
+export { HttpClient, type ApiError } from './utils/httpClient';
 export { RateLimiter } from './utils/rateLimiter';

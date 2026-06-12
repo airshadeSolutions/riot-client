@@ -1,124 +1,40 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { Samira } from '../../src/samira';
 import { REGIONS } from '../../src/constants';
+import {
+  createE2ESamira,
+  directRiotOnly,
+  E2E_ACCOUNT,
+  waitForRateLimit,
+} from '../e2e-utils';
 
 describe('Spectator Service E2E', () => {
   let samira: Samira;
 
   beforeAll(() => {
-    // Check if API key is available
-    if (!process.env.RIOT_API_KEY) {
-      console.warn('⚠️  RIOT_API_KEY not found, using test key for debugging');
-    }
-
-    samira = new Samira({
-      apiKey: process.env.RIOT_API_KEY!,
-      region: REGIONS.NA1,
-    });
+    samira = createE2ESamira(REGIONS.NA1);
   });
 
-  // Rate limiting helper function
-  const waitForRateLimit = async () => {
-    const status = samira.getRegionalClient().getRateLimitStatus();
-
-    if (!status.canMakeRequest) {
-      const delay = status.delayUntilNext;
-      await new Promise((resolve) => setTimeout(resolve, delay + 100));
-    }
-
-    if (status.requestsInWindow >= 80) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  };
-
   beforeEach(async () => {
-    // Wait for rate limits before each test
-    await waitForRateLimit();
+    await waitForRateLimit(samira.getRegionalClient());
   });
 
   describe('getActiveGameByPuuid', () => {
-    it('should fetch active game by PUUID successfully', async () => {
-      let puuid = '';
-
-      const featuredGames = await samira.spectator.getFeaturedGames();
-
-      expect(featuredGames.isRight()).toBe(true);
-
-      if (featuredGames.isRight()) {
-        const game = featuredGames.value.gameList[0];
-        puuid = game.participants[0].puuid;
-      }
-
-      const result = await samira.spectator.getActiveGameByPuuid(puuid);
-
-      expect(result.isRight()).toBe(true);
-      if (result.isRight()) {
-        const game = result.value;
-        expect(game).toBeDefined();
-        expect(game.gameId).toBeDefined();
-      }
-    });
-  });
-
-  describe('API response validation', () => {
-    it('should return properly formatted featured games data', async () => {
-      const result = await samira.spectator.getFeaturedGames();
-
-      expect(result.isRight()).toBe(true);
-      if (result.isRight()) {
-        const featuredGames = result.value;
-
-        // Validate data structure
-        expect(featuredGames).toHaveProperty('gameList');
-        expect(Array.isArray(featuredGames.gameList)).toBe(true);
-        expect(featuredGames.gameList.length).toBeGreaterThan(0);
-
-        const game = featuredGames.gameList[0];
-        expect(game).toHaveProperty('gameId');
-        expect(game).toHaveProperty('gameType');
-        expect(game).toHaveProperty('gameLength');
-        expect(game).toHaveProperty('mapId');
-        expect(game).toHaveProperty('gameMode');
-        expect(game).toHaveProperty('bannedChampions');
-        expect(game).toHaveProperty('gameQueueConfigId');
-        expect(game).toHaveProperty('observers');
-        expect(game).toHaveProperty('participants');
-
-        // Validate data types
-        expect(typeof game.gameId).toBe('number');
-        expect(typeof game.gameType).toBe('string');
-        expect(typeof game.gameLength).toBe('number');
-        expect(typeof game.mapId).toBe('number');
-        expect(typeof game.gameMode).toBe('string');
-        expect(Array.isArray(game.bannedChampions)).toBe(true);
-        expect(Array.isArray(game.participants)).toBe(true);
-        expect(game.participants.length).toBeGreaterThan(0);
-
-        // Validate participant data
-        const participant = game.participants[0];
-        expect(typeof participant.bot).toBe('boolean');
-        expect(typeof participant.puuid).toBe('string');
-        expect(typeof participant.spell1Id).toBe('number');
-        expect(typeof participant.spell2Id).toBe('number');
-        expect(typeof participant.profileIconId).toBe('number');
-        expect(typeof participant.championId).toBe('number');
-        expect(typeof participant.teamId).toBe('number');
-
-        // Validate data content
-        expect(participant.puuid).toMatch(/^[a-zA-Z0-9_-]{70,80}$/);
-      }
+    it('should expose active-game lookup but not removed featured-games lookup', () => {
+      expect(typeof samira.spectator.getActiveGameByPuuid).toBe('function');
+      expect((samira.spectator as any).getFeaturedGames).toBeUndefined();
     });
   });
 
   describe('Error handling', () => {
-    it('should handle unauthorized access', async () => {
+    directRiotOnly('should handle unauthorized access', async () => {
       // Create a Samira instance with invalid API key
       const invalidSamira = new Samira({
         apiKey: 'invalid-api-key',
         region: REGIONS.KR,
       });
 
-      const result = await invalidSamira.spectator.getFeaturedGames();
+      const result = await invalidSamira.spectator.getActiveGameByPuuid(E2E_ACCOUNT.puuid);
 
       expect(result.isLeft()).toBe(true);
       if (result.isLeft()) {

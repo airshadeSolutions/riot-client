@@ -1,45 +1,22 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { Samira } from '../../src/samira';
 import { REGIONS } from '../../src/constants';
+import { createE2ESamira, directRiotOnly, E2E_ACCOUNT, waitForRateLimit } from '../e2e-utils';
 
 describe('Account Service E2E', () => {
   let samira: Samira;
 
   beforeAll(() => {
-    // Check if API key is available
-    if (!process.env.RIOT_API_KEY) {
-      console.warn('⚠️  RIOT_API_KEY not found, using test key for debugging');
-    }
-
-    samira = new Samira({
-      apiKey: process.env.RIOT_API_KEY!,
-      region: REGIONS.BR1,
-    });
+    samira = createE2ESamira(E2E_ACCOUNT.region);
   });
 
-  // Rate limiting helper function
-  const waitForRateLimit = async () => {
-    const status = samira.getPlatformClient().getRateLimitStatus();
-
-    if (!status.canMakeRequest) {
-      const delay = status.delayUntilNext;
-      await new Promise((resolve) => setTimeout(resolve, delay + 100));
-    }
-
-    if (status.requestsInWindow >= 80) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  };
-
   beforeEach(async () => {
-    // Wait for rate limits before each test
-    await waitForRateLimit();
+    await waitForRateLimit(samira.getPlatformClient());
   });
 
   describe('getAccountByRiotId', () => {
     it('should fetch account by Riot ID successfully', async () => {
-      const gameName = 'Dave Mustaine';
-      const tagLine = 'trash';
+      const { gameName, tagLine } = E2E_ACCOUNT;
 
       const result = await samira.account.getAccountByRiotId(gameName, tagLine);
 
@@ -56,7 +33,7 @@ describe('Account Service E2E', () => {
     });
 
     it('should handle invalid Riot ID gracefully', async () => {
-      const gameName = 'Dave Mustaine';
+      const gameName = E2E_ACCOUNT.gameName;
       const tagLine = 'trasg';
 
       const result = await samira.account.getAccountByRiotId(gameName, tagLine);
@@ -71,8 +48,7 @@ describe('Account Service E2E', () => {
 
   describe('getAccountByPUUID', () => {
     it('should fetch account by PUUID successfully', async () => {
-      const puuid =
-        'ZrXebR0htvpXhiz8D75UGNtYhcCNRqXIAO4kGieSfwJbihV1PKTjTd2sP1CsgqClaL-vw812L7h7iQ';
+      const { puuid } = E2E_ACCOUNT;
 
       const result = await samira.account.getAccountByPuuid(puuid);
 
@@ -99,8 +75,7 @@ describe('Account Service E2E', () => {
 
   describe('API response validation', () => {
     it('should return properly formatted account data', async () => {
-      const gameName = 'Dave Mustaine';
-      const tagLine = 'trash';
+      const { gameName, tagLine } = E2E_ACCOUNT;
 
       const result = await samira.account.getAccountByRiotId(gameName, tagLine);
 
@@ -129,7 +104,7 @@ describe('Account Service E2E', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle unauthorized access', async () => {
+    directRiotOnly('should handle unauthorized access', async () => {
       // Create a Samira instance with invalid API key
       const invalidSamira = new Samira({
         apiKey: 'invalid-api-key',

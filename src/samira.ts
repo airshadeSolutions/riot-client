@@ -167,6 +167,7 @@ export function regionToPlatform(region: Region): Platform {
     kr: PLATFORMS.ASIA,
     la1: PLATFORMS.AMERICAS,
     la2: PLATFORMS.AMERICAS,
+    me1: PLATFORMS.EUROPE,
     na1: PLATFORMS.AMERICAS,
     oc1: PLATFORMS.SEA,
     ru: PLATFORMS.EUROPE,

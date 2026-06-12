@@ -1,46 +1,22 @@
-import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { Samira } from '../../src/samira';
 import { REGIONS } from '../../src/constants';
+import { createE2ESamira, directRiotOnly, E2E_ACCOUNT, waitForRateLimit } from '../e2e-utils';
 
 describe('Summoner Service E2E', () => {
   let samira: Samira;
 
   beforeAll(() => {
-    // Check if API key is available
-    if (!process.env.RIOT_API_KEY) {
-      console.warn('⚠️  RIOT_API_KEY not found, using test key for debugging');
-    }
-
-    // Initialize Samira with regional routing for account endpoints
-    samira = new Samira({
-      apiKey: process.env.RIOT_API_KEY!,
-      region: REGIONS.BR1,
-    });
+    samira = createE2ESamira(E2E_ACCOUNT.region);
   });
 
-  // Rate limiting helper function
-  const waitForRateLimit = async () => {
-    const status = samira.getRegionalClient().getRateLimitStatus();
-
-    if (!status.canMakeRequest) {
-      const delay = status.delayUntilNext;
-      await new Promise((resolve) => setTimeout(resolve, delay + 100));
-    }
-
-    if (status.requestsInWindow >= 80) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  };
-
   beforeEach(async () => {
-    // Wait for rate limits before each test
-    await waitForRateLimit();
+    await waitForRateLimit(samira.getRegionalClient());
   });
 
   describe('getSummonerByPuuid', () => {
     it('should fetch summoner by PUUID successfully', async () => {
-      const puuid =
-        'ZrXebR0htvpXhiz8D75UGNtYhcCNRqXIAO4kGieSfwJbihV1PKTjTd2sP1CsgqClaL-vw812L7h7iQ';
+      const { puuid } = E2E_ACCOUNT;
 
       const result = await samira.summoner.getSummonerByPuuid(puuid);
 
@@ -71,8 +47,7 @@ describe('Summoner Service E2E', () => {
 
   describe('API response validation', () => {
     it('should return properly formatted summoner data', async () => {
-      const puuid =
-        'ZrXebR0htvpXhiz8D75UGNtYhcCNRqXIAO4kGieSfwJbihV1PKTjTd2sP1CsgqClaL-vw812L7h7iQ';
+      const { puuid } = E2E_ACCOUNT;
 
       const result = await samira.summoner.getSummonerByPuuid(puuid);
 
@@ -104,7 +79,7 @@ describe('Summoner Service E2E', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle unauthorized access', async () => {
+    directRiotOnly('should handle unauthorized access', async () => {
       // Create a Samira instance with invalid API key
       const invalidSamira = new Samira({
         apiKey: 'invalid-api-key',

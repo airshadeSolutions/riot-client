@@ -15,6 +15,7 @@ export const REGIONS = {
   KR: 'kr',
   LA1: 'la1',
   LA2: 'la2',
+  ME1: 'me1',
   NA1: 'na1',
   OC1: 'oc1',
   PH2: 'ph2',
@@ -48,10 +49,12 @@ export const ENDPOINTS = {
 
   // Match endpoints
   MATCH_BY_ID: '/lol/match/v5/matches/{matchId}',
+  MATCH_TIMELINE_BY_ID: '/lol/match/v5/matches/{matchId}/timeline',
   MATCHES_BY_PUUID: '/lol/match/v5/matches/by-puuid/{puuid}/ids',
 
   // League endpoints
   LEAGUE_ENTRIES_BY_PUUID: '/lol/league/v4/entries/by-puuid/{encryptedPUUID}',
+  LEAGUE_EXP_ENTRIES: '/lol/league-exp/v4/entries/{queue}/{tier}/{division}',
 
   // Account endpoints
   ACCOUNT_BY_PUUID: '/riot/account/v1/accounts/by-puuid/{puuid}',
@@ -67,7 +70,6 @@ export const ENDPOINTS = {
 
   // Spectator endpoints
   CURRENT_GAME_BY_SUMMONER: '/lol/spectator/v5/active-games/by-summoner/{encryptedPUUID}',
-  FEATURED_GAMES: '/lol/spectator/v5/featured-games',
 
   // Status endpoints
   PLATFORM_STATUS: '/lol/status/v4/platform-data',

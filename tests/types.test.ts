@@ -522,6 +522,163 @@ describe('Zod Schemas', () => {
       expect(result.info.participants).toHaveLength(1);
       expect(result.info.teams).toHaveLength(1);
     });
+
+    it('should preserve unknown match, participant, challenge, mission, and perk fields', () => {
+      const driftedMatch = {
+        metadata: {
+          dataVersion: '2',
+          matchId: 'EUW1_1234567890',
+          participants: ['puuid-1'],
+          metadataFutureField: 'kept',
+        },
+        info: {
+          gameCreation: 1640995200000,
+          gameDuration: 1800,
+          gameEndTimestamp: 1640997000000,
+          gameId: 1234567890,
+          gameMode: 'CLASSIC',
+          gameName: 'game_name',
+          gameStartTimestamp: 1640995200000,
+          gameType: 'MATCHED_GAME',
+          gameVersion: '16.1.1.1',
+          mapId: 11,
+          platformId: 'EUW1',
+          queueId: 420,
+          endOfGameResult: 'GameComplete',
+          participants: [
+            {
+              participantId: 1,
+              puuid: 'puuid-1',
+              PlayerScore0: 1,
+              PlayerBehavior: { behaviorScore: 1 },
+              basicPings: 2,
+              damageDealtToEpicMonsters: 3,
+              playerAugment5: 4,
+              selectedRolePreferences: 'MIDDLE,JUNGLE',
+              futureParticipantField: { nested: true },
+              challenges: {
+                '12AssistStreakCount': 1,
+                HealFromMapSources: 2,
+                seasonFutureChallenge: 3,
+              },
+              missions: {
+                playerScore0: 1,
+                PlayerScore0: 2,
+                missionFutureField: 3,
+              },
+              perks: {
+                statPerks: {
+                  defense: 5002,
+                  flex: 5008,
+                  offense: 5005,
+                  statFutureField: 1,
+                },
+                styles: [
+                  {
+                    description: 'primaryStyle',
+                    style: 8000,
+                    styleFutureField: true,
+                    selections: [
+                      {
+                        perk: 8005,
+                        var1: 1,
+                        var2: 2,
+                        var3: 3,
+                        selectionFutureField: 'kept',
+                      },
+                    ],
+                  },
+                ],
+                perksFutureField: 'kept',
+              },
+            },
+          ],
+          teams: [
+            {
+              bans: [],
+              objectives: {
+                atakhan: {
+                  first: true,
+                  kills: 1,
+                },
+                baron: {
+                  first: false,
+                  kills: 0,
+                },
+                champion: {
+                  first: false,
+                  kills: 0,
+                },
+                dragon: {
+                  first: false,
+                  kills: 0,
+                },
+                inhibitor: {
+                  first: false,
+                  kills: 0,
+                },
+                riftHerald: {
+                  first: false,
+                  kills: 0,
+                },
+                tower: {
+                  first: false,
+                  kills: 0,
+                },
+              },
+              teamId: 100,
+              win: true,
+            },
+          ],
+          infoFutureField: 'kept',
+        },
+        topLevelFutureField: 'kept',
+      };
+
+      const result = MatchSchema.parse(driftedMatch);
+      const participant = result.info.participants[0] as any;
+
+      expect((result as any).topLevelFutureField).toBe('kept');
+      expect((result.metadata as any).metadataFutureField).toBe('kept');
+      expect((result.info as any).infoFutureField).toBe('kept');
+      expect(participant.futureParticipantField).toEqual({ nested: true });
+      expect(participant.challenges.seasonFutureChallenge).toBe(3);
+      expect(participant.missions.missionFutureField).toBe(3);
+      expect(participant.perks.perksFutureField).toBe('kept');
+      expect(participant.perks.statPerks.statFutureField).toBe(1);
+      expect(participant.perks.styles[0].styleFutureField).toBe(true);
+      expect(participant.perks.styles[0].selections[0].selectionFutureField).toBe('kept');
+      expect((result.info.teams[0].objectives as any).atakhan).toEqual({ first: true, kills: 1 });
+    });
+
+    it('should tolerate participant field drift by accepting a minimal participant object', () => {
+      const driftedMatch = {
+        metadata: {
+          dataVersion: '2',
+          matchId: 'EUW1_1234567891',
+          participants: ['puuid-1'],
+        },
+        info: {
+          gameCreation: 1640995200000,
+          gameDuration: 1800,
+          gameEndTimestamp: 1640997000000,
+          gameId: 1234567891,
+          gameMode: 'CLASSIC',
+          gameName: 'game_name',
+          gameStartTimestamp: 1640995200000,
+          gameType: 'MATCHED_GAME',
+          gameVersion: '16.1.1.1',
+          mapId: 11,
+          platformId: 'EUW1',
+          queueId: 420,
+          participants: [{ puuid: 'puuid-1' }],
+          teams: [],
+        },
+      };
+
+      const result = MatchSchema.parse(driftedMatch);
+      expect(result.info.participants[0].puuid).toBe('puuid-1');
+    });
   });
 
   describe('LeagueEntrySchema', () => {
@@ -572,6 +729,26 @@ describe('Zod Schemas', () => {
       const result = LeagueEntrySchema.parse(validLeagueEntryWithSeries);
       expect(result.miniSeries?.progress).toBe('WLW');
       expect(result.miniSeries?.target).toBe(3);
+    });
+
+    it('should validate league-exp entries without leagueId', () => {
+      const validLeagueExpEntry = {
+        puuid: 'encrypted-puuid',
+        queueType: 'RANKED_SOLO_5x5',
+        tier: 'DIAMOND',
+        rank: 'I',
+        leaguePoints: 75,
+        wins: 27,
+        losses: 25,
+        hotStreak: true,
+        veteran: false,
+        freshBlood: false,
+        inactive: false,
+      };
+
+      const result = LeagueEntrySchema.parse(validLeagueExpEntry);
+      expect(result.leagueId).toBeUndefined();
+      expect(result.tier).toBe('DIAMOND');
     });
   });
 

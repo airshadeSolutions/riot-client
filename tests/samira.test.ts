@@ -121,6 +121,7 @@ describe('Samira', () => {
         expect(regionToPlatform(REGIONS.BR1)).toBe(PLATFORMS.AMERICAS);
         expect(regionToPlatform(REGIONS.EUW1)).toBe(PLATFORMS.EUROPE);
         expect(regionToPlatform(REGIONS.KR)).toBe(PLATFORMS.ASIA);
+        expect(regionToPlatform(REGIONS.ME1)).toBe(PLATFORMS.EUROPE);
       });
     });
   });

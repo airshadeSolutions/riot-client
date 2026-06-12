@@ -5,7 +5,7 @@ export const SpectatorPerksSchema = z.object({
   perkIds: z.array(z.number()),
   perkStyle: z.number(),
   perkSubStyle: z.number(),
-});
+}).passthrough();
 
 export const SpectatorParticipantSchema = z.object({
   championId: z.number(),
@@ -17,7 +17,7 @@ export const SpectatorParticipantSchema = z.object({
   spell2Id: z.number(),
   perks: SpectatorPerksSchema.optional(),
   gameCustomizationObjects: z.array(GameCustomizationObjectSchema).optional(),
-});
+}).passthrough();
 
 export type Perks = z.infer<typeof SpectatorPerksSchema>;
 export type Participant = z.infer<typeof SpectatorParticipantSchema>;

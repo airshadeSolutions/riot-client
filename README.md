@@ -1,385 +1,293 @@
-# Samira - League of Legends API Library
+# @airshade/riot-client
 
-[![](https://img.shields.io/npm/v/samira.svg)](https://www.npmjs.com/package/samira)
+TypeScript Riot API client for Airshade. This package is a hard fork of
+`samira` by Gabriel-Passoss, adapted for Airshade's `riot-gateway`, lossless
+match ingestion, and configurable client-side rate limiting.
 
-A TypeScript library for League of Legends API calls with built-in rate limiting, error handling, and type safety.
+The client can talk directly to Riot or route every request through
+`riot-gateway` in PATH mode:
 
-## Features
+```text
+{gatewayBaseUrl}/{routingValue}/{riot-path}
+```
 
-- 🚀 **Riot Games API Integration** - Full support for all major endpoints
-- ⚡ **Built-in Rate Limiting** - Automatic rate limit handling and retry logic
-- 🛡️ **Type Safety** - Full TypeScript support with Zod validation
-- 🔄 **Regional & Platform Routing** - Smart routing for different API endpoints
-- 🎯 **Error Handling** - Comprehensive error handling with Either types
-- 📦 **Data Dragon Integration** - Access to League of Legends game assets
-- 🧪 **Testing** - Comprehensive test suite with Vitest
+For data pipelines, match responses can be fetched in raw mode so Riot payloads
+reach storage without schema stripping.
 
-## Installation
+## Install
 
-```bash
-npm install samira
+From GitHub:
+
+```sh
+npm install git+https://github.com/airshadeSolutions/riot-client.git
+```
+
+If published to npm:
+
+```sh
+npm install @airshade/riot-client
 ```
 
 ## Quick Start
 
-### Using Samira (Main Library)
+```ts
+import { Samira, REGIONS } from '@airshade/riot-client';
 
-```typescript
-import { Samira } from 'samira';
-
-const samira = new Samira({
-  apiKey: 'your-riot-api-key',
-  region: 'na1',
+const riot = new Samira({
+  apiKey: process.env.RIOT_API_KEY!,
+  region: REGIONS.EUW1,
 });
 
-// Get summoner information
-const summoner = await samira.summoner.getSummonerByPuuid('puuid-here');
+const account = await riot.account.getAccountByRiotId('GameName', 'EUW');
+
+if (account.isRight()) {
+  console.log(account.value.puuid);
+} else {
+  console.error(account.value.status, account.value.message);
+}
 ```
 
-### Using DataDragon (Game Assets)
+All service methods return `Either<ApiError, T>`:
 
-```typescript
-import { DataDragon } from 'samira';
+```ts
+const result = await riot.summoner.getSummonerByPuuid('puuid');
 
-const dataDragon = new DataDragon({
+if (result.isRight()) {
+  // result.value is the successful response
+} else {
+  // result.value is ApiError
+}
+```
+
+## Gateway Mode
+
+When `baseUrl` is set, requests are routed through `riot-gateway`. The gateway
+is expected to inject the real Riot API key, so the local `apiKey` can be a
+placeholder.
+
+```ts
+import { Samira, REGIONS } from '@airshade/riot-client';
+
+const riot = new Samira({
+  apiKey: 'gateway-injects-key',
+  region: REGIONS.EUW1,
+  baseUrl: 'http://localhost:8001',
+  rateLimit: false,
+  retryOn429: false,
+  defaultHeaders: {
+    'x-airshade-service': 'my-service',
+  },
+});
+```
+
+Recommended gateway settings:
+
+- `rateLimit: false`: do not double-limit. Let `riot-gateway` own Riot quotas.
+- `retryOn429: false`: let the caller react to gateway `429` and `Retry-After`.
+- `defaultHeaders`: identify the internal service for gateway logs and stats.
+- `priority: 'high'`: optional, sends `x-priority: high` for gateway priority queues.
+
+Routing examples in gateway mode:
+
+- Account and Match APIs use regional routing such as `europe`.
+- Summoner, League, Spectator, and League-Exp use platform routing such as `euw1`.
+
+The `Samira` constructor chooses the correct route family from the configured
+platform.
+
+## Direct Riot Mode
+
+Without `baseUrl`, the client calls Riot hosts directly and sends `X-Riot-Token`.
+
+```ts
+const riot = new Samira({
+  apiKey: process.env.RIOT_API_KEY!,
+  region: REGIONS.NA1,
+  rateLimit: {
+    requestsPerSecond: 20,
+    requestsPerTwoMinutes: 100,
+  },
+});
+```
+
+By default, direct mode uses the built-in rate limiter and retries once on `429`
+after honoring `Retry-After`.
+
+## Services
+
+### Account
+
+```ts
+await riot.account.getAccountByRiotId('GameName', 'TagLine');
+await riot.account.getAccountByPuuid('puuid');
+```
+
+### Summoner
+
+```ts
+await riot.summoner.getSummonerByPuuid('puuid');
+```
+
+### League
+
+```ts
+await riot.league.getEntriesByPuuid('puuid');
+
+// league-exp-v4, useful for rank-stratified crawling
+await riot.league.getLeagueExpEntries('RANKED_SOLO_5x5', 'DIAMOND', 'I', 1);
+await riot.league.getEntries('RANKED_FLEX_SR', 'EMERALD', 'II', 3);
+```
+
+### Match
+
+```ts
+await riot.match.getMatchHistoryByPUUID('puuid', {
+  type: 'ranked',
+  count: 20,
+  queue: 420,
+});
+
+await riot.match.getMatchById('EUW1_1234567890');
+await riot.match.getMatchesByIds(['EUW1_1234567890', 'EUW1_1234567891']);
+await riot.match.getRecentMatches('puuid', 20);
+await riot.match.getMatchesInTimeRange('puuid', 1700000000, 1700500000);
+await riot.match.getMatchesByQueue('puuid', 420);
+```
+
+Raw match mode skips Zod parsing and returns the Riot response as `unknown`:
+
+```ts
+const raw = await riot.match.getMatchById('EUW1_1234567890', { raw: true });
+
+if (raw.isRight()) {
+  // Store raw.value as JSON without schema filtering.
+}
+```
+
+Timelines are returned raw:
+
+```ts
+const timeline = await riot.match.getMatchTimelineById('EUW1_1234567890');
+```
+
+### Spectator
+
+```ts
+await riot.spectator.getActiveGameByPuuid('puuid');
+```
+
+## Match Schema Policy
+
+Riot match payloads drift over time. This fork keeps match parsing permissive:
+
+- Match, metadata, info, team, participant, challenge, mission, and perks schemas
+  preserve unknown fields with `.passthrough()`.
+- Participant fields are optional so field removals or renames do not fail the
+  whole match parse.
+- Known newer fields are represented, including `endOfGameResult`, new ping
+  counters, integrity flags, `PlayerScore*`, `playerAugment5/6`,
+  `positionAssignedByMatchmaking`, `selectedRolePreferences`, and others.
+- `getMatchById(matchId, { raw: true })` is available for pipelines that must
+  avoid validation entirely.
+
+For large crawl/data-plane workloads, prefer raw mode and store the response
+directly. Use parsed matches for application logic where typed access is more
+valuable than avoiding validation.
+
+## Data Dragon
+
+`DataDragon` fetches League of Legends static data and can cache common datasets
+after `init()`.
+
+```ts
+import { DataDragon } from '@airshade/riot-client';
+
+const ddragon = new DataDragon({
   version: 'latest',
   language: 'en_US',
   includeFullUrl: true,
 });
 
-// Initialize the service (fetches and caches all data)
-await dataDragon.init();
+await ddragon.init();
 
-// Get champion information
-const champions = await dataDragon.getChampions();
-const aatrox = dataDragon.getChampionResumeById(266);
+const champions = await ddragon.getChampions();
+const items = await ddragon.getItems();
+const runes = await ddragon.getRunes();
+const spells = await ddragon.getSummonerSpells();
 
-// Get asset URLs
-const championImage = dataDragon.getChampionImageUrl('Aatrox');
-const itemImage = dataDragon.getItemImageUrl('1001');
+const aatrox = ddragon.getChampionResumeById(266);
+const boots = ddragon.getItemById(1001);
+
+const championImage = ddragon.getChampionImageUrl(266);
+const itemImage = ddragon.getItemImageUrl('1001');
+const profileIcon = ddragon.getProfileIconUrl(1);
 ```
 
-## Configuration
+## Lower-Level Clients
 
-```typescript
-const samira = new Samira({
-  apiKey: 'your-riot-api-key',
-  region: 'na1', // or 'euw1', 'kr', etc.
-});
-```
+You can compose services manually with `HttpClient` when you need explicit
+routing or custom transport settings:
 
-## Services
+```ts
+import { HttpClient, MatchService } from '@airshade/riot-client';
 
-### Account Service
-
-```typescript
-// Get account by Riot ID
-const account = await samira.account.getAccountByRiotId('GameName', 'TagLine');
-
-// Get account by PUUID
-const account = await samira.account.getAccountByPuuid('puuid-here');
-```
-
-### Summoner Service
-
-```typescript
-// Get summoner by PUUID
-const summoner = await samira.summoner.getSummonerByPuuid('puuid-here');
-```
-
-### Match Service
-
-```typescript
-// Get match by ID
-const match = await samira.match.getMatchById('match-id-here');
-
-// Get match history
-const matchHistory = await samira.match.getMatchHistoryByPUUID('puuid-here');
-
-// Get recent matches
-const recentMatches = await samira.match.getRecentMatches('puuid-here', 20);
-```
-
-### Spectator Service
-
-```typescript
-// Get active game by PUUID
-const activeGame = await samira.spectator.getActiveGameByPuuid('puuid-here');
-
-// Get featured games
-const featuredGames = await samira.spectator.getFeaturedGames();
-```
-
-### Data Dragon Service
-
-```typescript
-// Get latest game version
-const versions = await samira.dataDragon.getLatestVersion();
-
-// Get all champions
-const champions = await samira.dataDragon.getChampions();
-
-// Get specific champion
-const aatrox = await samira.dataDragon.getChampion('Aatrox');
-
-// Get all items
-const items = await samira.dataDragon.getItems();
-
-// Get specific item
-const doransBlade = await samira.dataDragon.getItem(1055);
-```
-
-## Types and Schemas
-
-Samira provides comprehensive TypeScript types and Zod schemas for all API responses. You can import and use these types in your own code:
-
-### Importing All Types
-
-```typescript
-import {
-  // Core types
-  Champion,
-  Summoner,
-  Match,
-  LeagueEntry,
-  Account,
-  CurrentGame,
-
-  // Zod schemas for validation
-  ChampionSchema,
-  SummonerSchema,
-  MatchSchema,
-  LeagueEntrySchema,
-  AccountSchema,
-  CurrentGameSchema,
-
-  // Utility types
-  Either,
-  Left,
-  Right,
-
-  // Constants
-  REGIONS,
-  PLATFORMS,
-  ENDPOINTS,
-} from 'samira';
-```
-
-### Type Categories
-
-#### Data Dragon Types
-
-- `Champion`, `Champions` - Champion data and lists
-- `ItemAsset`, `RuneAsset`, `SummonerSpellAsset` - Game assets
-- `ChampionInfo`, `ChampionStats`, `ChampionSkin`, `ChampionSpell`, `ChampionPassive`
-
-#### Account & Summoner Types
-
-- `Account` - Riot account information
-- `Summoner` - Summoner profile data
-- `ChampionMastery` - Champion mastery information
-
-#### League Types
-
-- `LeagueEntry` - Ranked league information
-- `MiniSeries` - Promotion series data
-- `Rank`, `Tier` - Rank and tier enums
-
-#### Match Types
-
-- `Match`, `MatchMetadata`, `MatchInfo` - Match data structure
-- `MatchParticipant` - Individual player data
-- `Challenge`, `Mission` - Advanced match statistics
-- `MatchTeam`, `Ban`, `Objective` - Team and objective data
-
-#### Spectator Types
-
-- `CurrentGame` - Active game information
-- `FeaturedGames` - Featured games list
-- `SpectatorParticipant` - Player data in spectator mode
-
-### Using Zod Schemas for Validation
-
-```typescript
-import { ChampionSchema, MatchSchema } from 'samira';
-
-// Validate API responses at runtime
-const champion = ChampionSchema.parse(apiResponse);
-const match = MatchSchema.parse(matchData);
-
-// Type-safe data with validation
-if (ChampionSchema.safeParse(data).success) {
-  // data is now typed as Champion
-  console.log(data.name);
-}
-```
-
-### Error Handling with Either Types
-
-```typescript
-import { Either, Left, Right } from 'samira';
-
-// Handle API responses with type safety
-const result: Either<Error, Champion> = await getChampionData();
-
-if (result.isRight()) {
-  const champion = result.value; // Type: Champion
-  console.log(champion.name);
-} else {
-  const error = result.value; // Type: Error
-  console.error(error.message);
-}
-```
-
-const items = await samira.dataDragon.getItems();
-
-// Get specific item
-const boots = await samira.dataDragon.getItem('1001');
-
-// Get runes
-const runes = await samira.dataDragon.getRunes();
-
-// Get summoner spells
-const spells = await samira.dataDragon.getSummonerSpells();
-
-````
-
-## Asset URLs
-
-The Data Dragon service provides methods to generate asset URLs:
-
-```typescript
-// Champion images
-const championImage = samira.dataDragon.getChampionImageUrl('Aatrox');
-const skinImage = samira.dataDragon.getChampionImageUrl('Aatrox', '1'); // Skin ID 1
-
-// Item images
-const itemImage = samira.dataDragon.getItemImageUrl('1001');
-
-// Profile icons
-const profileIcon = samira.dataDragon.getProfileIconUrl(1);
-
-// Champion splash art
-const splashArt = samira.dataDragon.getChampionSplashUrl('Aatrox');
-const skinSplash = samira.dataDragon.getChampionSplashUrl('Aatrox', '1');
-
-// Champion loading screens
-const loadingScreen = samira.dataDragon.getChampionLoadingUrl('Aatrox');
-const skinLoading = samira.dataDragon.getChampionLoadingUrl('Aatrox', '1');
-
-// Rune images
-const runeImage = samira.dataDragon.getRuneImageUrl(8000);
-
-// Summoner spell images
-const spellImage = samira.dataDragon.getSummonerSpellImageUrl('SummonerFlash');
-````
-
-### URL Configuration
-
-You can control whether the service returns full URLs or just asset paths:
-
-```typescript
-// Initialize with full URLs
-const samira = new Samira({
-  apiKey: 'your-key',
-  dataDragon: {
-    includeFullUrl: true, // Returns: https://ddragon.leagueoflegends.com/cdn/13.1.1/img/champion/Aatrox.png
+const client = new HttpClient({
+  baseURL: 'http://localhost:8001/europe',
+  apiKey: 'gateway-injects-key',
+  rateLimit: false,
+  retryOn429: false,
+  defaultHeaders: {
+    'x-airshade-service': 'analytics-worker',
   },
 });
 
-// Initialize with asset paths only
-const samira = new Samira({
-  apiKey: 'your-key',
-  dataDragon: {
-    includeFullUrl: false, // Returns: img/champion/Aatrox.png
-  },
-});
-
-// Update configuration at runtime
-samira.dataDragon.updateConfig({
-  includeFullUrl: true,
-  language: 'pt_BR',
-  version: '13.2.1',
-});
+const match = new MatchService(client);
+const result = await match.getMatchById('EUW1_1234567890', { raw: true });
 ```
 
-## Routing
+## Exports
 
-### Platform Routing (Game-specific endpoints)
+Main exports:
 
-```typescript
-samira.usePlatformRouting(); // Uses platform-specific endpoints
-// Examples: /lol/summoner/v4/, /lol/match/v5/, /lol/spectator/v5/
+- `Samira`
+- `DataDragon`
+- Services: `AccountService`, `LeagueService`, `MatchService`,
+  `SpectatorService`, `SummonerService`
+- Utilities: `HttpClient`, `RateLimiter`
+- Types and schemas from `src/types`
+- Constants: `REGIONS`, `PLATFORMS`, `REGIONAL_ROUTING`, `ENDPOINTS`,
+  `QUEUE_TYPES`, `GAME_MODES`, `MAP_IDS`, `TIER_LEVELS`, `RANK_DIVISIONS`
+
+## Development
+
+```sh
+npm install
+npm run build
+npm test -- --run
 ```
 
-### Regional Routing (Account endpoints)
+Useful test subsets:
 
-```typescript
-samira.useRegionalRouting(); // Uses regional endpoints
-// Examples: /riot/account/v1/
+```sh
+npm test -- --run tests/services/new-endpoints.spec.ts
+npm test -- --run tests/types.test.ts
 ```
 
-## Error Handling
+The package builds to `dist/` and exports only `dist/index.js` and generated
+types.
 
-All service methods return `Either<ApiError, T>` types for robust error handling:
+## Attribution and License
 
-```typescript
-const result = await samira.summoner.getSummonerByPuuid('puuid-here');
+This package is an Airshade-maintained hard fork of `samira` by
+Gabriel-Passoss.
 
-if (result.isRight()) {
-  // Success case
-  const summoner = result.value;
-  console.log('Summoner name:', summoner.name);
-} else {
-  // Error case
-  const error = result.value;
-  console.error('Error:', error.message);
-  console.error('Status:', error.status);
-}
+The original MIT license and copyright notice are preserved in
+[`LICENSE`](./LICENSE):
+
+```text
+MIT License
+
+Copyright (c) 2025 Gabriel-Passoss
 ```
 
-## Rate Limiting
-
-The library automatically handles Riot Games API rate limits:
-
-```typescript
-// Check rate limit status
-const status = samira.getHttpClient().getRateLimitStatus();
-console.log('Can make request:', status.canMakeRequest);
-console.log('Requests in window:', status.requestsInWindow);
-console.log('Delay until next:', status.delayUntilNext);
-
-// Reset rate limiter if needed
-samira.getHttpClient().resetRateLimiter();
-```
-
-## Testing
-
-Run the test suite:
-
-```bash
-# Run all tests
-npm test
-
-# Run E2E tests
-npm run test:e2e
-
-# Run specific test file
-npm test -- tests/services/summoner.spec.ts
-
-# Run with coverage
-npm run test:coverage
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Run the test suite
-6. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
+Airshade changes are also distributed under the MIT license.

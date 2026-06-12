@@ -4,7 +4,7 @@ import { RankSchema } from './rank';
 import { TierSchema } from './tier';
 
 export const LeagueEntrySchema = z.object({
-  leagueId: z.string(),
+  leagueId: z.string().optional(),
   puuid: z.string(),
   queueType: z.string(),
   tier: TierSchema,
