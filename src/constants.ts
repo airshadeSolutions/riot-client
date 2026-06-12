@@ -73,9 +73,6 @@ export const ENDPOINTS = {
 
   // Status endpoints
   PLATFORM_STATUS: '/lol/status/v4/platform-data',
-
-  // Data dragon
-  DATA_DRAGON: 'https://ddragon.leagueoflegends.com',
 } as const;
 
 // Queue types
@@ -175,6 +172,36 @@ export const RANK_DIVISIONS = {
 
 export type Region = (typeof REGIONS)[keyof typeof REGIONS];
 export type Platform = (typeof PLATFORMS)[keyof typeof PLATFORMS];
+
+/**
+ * Map a platform routing value (`euw1`) to its regional cluster (`europe`),
+ * the gateway path prefix for cluster-routed endpoints (match-v5, account-v1).
+ */
+export function regionToPlatform(region: Region): Platform {
+  const regionMap: { [key in Region]: Platform } = {
+    br1: PLATFORMS.AMERICAS,
+    eun1: PLATFORMS.EUROPE,
+    euw1: PLATFORMS.EUROPE,
+    jp1: PLATFORMS.ASIA,
+    kr: PLATFORMS.ASIA,
+    la1: PLATFORMS.AMERICAS,
+    la2: PLATFORMS.AMERICAS,
+    me1: PLATFORMS.EUROPE,
+    na1: PLATFORMS.AMERICAS,
+    oc1: PLATFORMS.SEA,
+    ru: PLATFORMS.EUROPE,
+    tr1: PLATFORMS.EUROPE,
+    ph2: PLATFORMS.SEA,
+    sg2: PLATFORMS.SEA,
+    th2: PLATFORMS.SEA,
+    vn2: PLATFORMS.SEA,
+    tw2: PLATFORMS.ASIA,
+  };
+
+  const cluster = regionMap[region];
+  if (!cluster) throw new Error(`Region ${region} doesn't exist!`);
+  return cluster;
+}
 export type RegionalRouting = (typeof REGIONAL_ROUTING)[keyof typeof REGIONAL_ROUTING];
 export type QueueType = (typeof QUEUE_TYPES)[keyof typeof QUEUE_TYPES];
 export type GameMode = (typeof GAME_MODES)[keyof typeof GAME_MODES];

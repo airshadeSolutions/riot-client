@@ -1,22 +1,15 @@
-// Main library export
-export { Samira } from './samira';
+// Thin riot-gateway transport — its only job is forwarding Riot requests to the
+// gateway in PATH mode and returning the raw payload. No API key, no client-side
+// rate limiting, no schema validation, no retries.
+export {
+  RiotGatewayClient,
+  type RiotGatewayClientConfig,
+  type GatewayResult,
+  type GatewayFailure,
+} from './gateway';
 
-// Export DataDragon class
-export { DataDragon } from './dataDragon';
-
-// Export all types
+// Lightweight response types for the convenience helpers (not runtime-validated).
 export * from './types';
 
-// Export constants
+// Routing values, endpoint paths and enums.
 export * from './constants';
-
-// Export services
-export { AccountService } from './services/account';
-export { LeagueService } from './services/league';
-export { MatchService } from './services/match';
-export { SpectatorService } from './services/spectator';
-export { SummonerService } from './services/summoner';
-
-// Export utilities
-export { HttpClient, type ApiError } from './utils/httpClient';
-export { RateLimiter } from './utils/rateLimiter';
